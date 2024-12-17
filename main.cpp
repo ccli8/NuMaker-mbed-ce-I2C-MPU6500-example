@@ -1,26 +1,59 @@
-// NuMaker-PFM-NUC472 : I2C0 reading IMU (3-axis accelerometer & 3-axis gyroscope)
 #include "mbed.h"
 #include "mpu6500.h"
 
-I2C i2c0(PC_9, PA_15); // I2C0_SDA, I2C0_SCL
+/* Calculate tilt angle */
+#define CALCULATE_TILT_ANGLE    1
 
-MPU6500 IMU; // IMU use on-board MPU6500
+#if CALCULATE_TILT_ANGLE
+#include "math.h"
+#define PI 3.14159265359
+#endif
+
+using namespace mbed_nuvoton;
+
+#if TARGET_NUMAKER_PFM_NUC472
+I2C i2c_mpu6500(PC_9, PA_15);
+#elif TARGET_NUMAKER_IOT_M467
+I2C i2c_mpu6500(PD_0, PD_1);
+#else
+I2C i2c_mpu6500(I2C_SDA, I2C_SCL);
+#endif
+
+MPU6500 IMU(i2c_mpu6500);
 
 int main() {
     int16_t accX,  accY,  accZ;
     int16_t gyroX, gyroY, gyroZ;
+#if CALCULATE_TILT_ANGLE
+    float X2, Y2, Z2;
+    float theta, psi, phi;
+#endif
 
-    i2c0.frequency(400000);    
+    i2c_mpu6500.frequency(400000);
     IMU.initialize();
-    
+
     while(true) {
-       accX = IMU.getAccelXvalue();
-       accY = IMU.getAccelYvalue();
-       accZ = IMU.getAccelZvalue();
-       gyroX= IMU.getGyroXvalue();
-       gyroY= IMU.getGyroYvalue();
-       gyroZ= IMU.getGyroZvalue();
-       printf("Acc: %6d, %6d, %6d, ",   accX, accY, accZ);
-       printf("Gyro:%6d, %6d, %6d\n\r", gyroX, gyroY, gyroZ);       
+        /* I2C reading IMU (3-axis accelerometer & 3-axis gyroscope) */
+        accX = IMU.getAccelXvalue();
+        accY = IMU.getAccelYvalue();
+        accZ = IMU.getAccelZvalue();
+        gyroX= IMU.getGyroXvalue();
+        gyroY= IMU.getGyroYvalue();
+        gyroZ= IMU.getGyroZvalue();
+        printf("Acc: %6d, %6d, %6d, ",   accX, accY, accZ);
+        printf("Gyro:%6d, %6d, %6d\n\r", gyroX, gyroY, gyroZ); 
+
+#if CALCULATE_TILT_ANGLE
+        /* degree = radians * 180 / PI */
+       X2 = pow(accX,2.0);
+       Y2 = pow(accY, 2.0);
+       Z2 = pow(accZ,2.0);
+       theta = atan(accX / sqrt(Y2 + Z2)) * 180 / PI;
+       psi   = atan(accY / sqrt(Z2 + X2)) * 180 / PI;
+       phi   = atan(sqrt(X2 + Y2) / accZ) * 180 / PI;
+       printf("theta=%d, psi=%d, phi=%d\n\r", (int) theta, (int) psi, (int) phi);         
+#endif
+
+        ThisThread::sleep_for(1s);
     }
 }
